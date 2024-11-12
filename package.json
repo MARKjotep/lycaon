@@ -4,6 +4,8 @@
   "description": "lycaon",
   "author": "Marky <markjotep@gmail.com>",
   "license": "MIT",
+  "types": "./index.d.ts",
+  "main": "index.js",
   "keywords": [
     "ts",
     "bun"
@@ -19,7 +21,6 @@
   "scripts": {
     "build": "tsc ; dist=../../DIST/lycaon/ ; cp -r package.json $dist ; cp -r ./types/types.d.ts $dist/types; bun install --cwd $dist; "
   },
-  "types": "./index.d.ts",
   "dependencies": {
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
@@ -31,7 +32,6 @@
     "@types/pg": "^8.11.10",
     "@types/bun": "latest"
   },
-  "main": "index.js",
   "peerDependencies": {
     "typescript": "^5.0.0"
   }
