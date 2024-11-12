@@ -4,6 +4,18 @@
   "description": "lycaon",
   "author": "Marky <markjotep@gmail.com>",
   "license": "MIT",
+  "keywords": [
+    "ts",
+    "bun"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MARKjotep/lycaon.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MARKjotep/lycaon/issues"
+  },
+  "homepage": "https://github.com/MARKjotep/lycaon#readme",
   "scripts": {
     "build": "tsc ; dist=../../DIST/lycaon/ ; cp -r package.json $dist ; cp -r ./types/types.d.ts $dist/types; bun install --cwd $dist; "
   },
@@ -17,8 +29,5 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/pg": "^8.11.10"
-  },
-  "keywords": [
-    "ts"
-  ]
+  }
 }
