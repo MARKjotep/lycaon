@@ -22,10 +22,8 @@
     "paths": {
       "*": ["node_modules/*"]
     },
-    "typeRoots": ["types/types.d.ts", "node_modules/@types"]
+    "typeRoots": ["node_modules/@types"]
   },
-
-  "include": ["**/*.ts", "types/types.d.ts"],
   "exclude": [
     "**/.*",
     "./**/css",
