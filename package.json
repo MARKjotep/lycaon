@@ -4,7 +4,7 @@
   "description": "lycaon",
   "author": "Marky <markjotep@gmail.com>",
   "license": "MIT",
-  "types": "./index.d.ts",
+  "types": "./types/index.d.ts",
   "main": "index.js",
   "keywords": [
     "ts",
