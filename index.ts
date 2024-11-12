@@ -265,62 +265,6 @@ export const html = {
   },
 };
 
-// returns number in milliseconds format
-export class Time {
-  date: Date;
-  constructor(dateMS?: number) {
-    this.date = dateMS ? new Date(dateMS) : new Date();
-  }
-  delta(date2: number | null = null, _Date: boolean = false) {
-    const TD = Time.delta(this.date.getTime(), date2);
-    return _Date ? new Date(TD) : TD;
-  }
-  //
-  timed(time?: {
-    year?: number;
-    month?: number;
-    day?: number;
-    hour?: number;
-    minute?: number;
-    second?: number;
-  }) {
-    const tmd = this.date.getTime();
-    let endD = this.date;
-    if (time) {
-      const { year, month, day, hour, minute, second } = time;
-      if (year) {
-        endD = new Date(endD.setFullYear(endD.getFullYear() + year));
-      }
-      if (month) {
-        endD = new Date(endD.setMonth(endD.getMonth() + month));
-      }
-      if (day) {
-        endD = new Date(endD.setDate(endD.getDate() + day));
-      }
-      if (hour) {
-        endD = new Date(endD.setHours(endD.getHours() + hour));
-      }
-      if (minute) {
-        endD = new Date(endD.setMinutes(endD.getMinutes() + minute));
-      }
-      if (second) {
-        endD = new Date(endD.setSeconds(endD.getSeconds() + second));
-      }
-    }
-    return endD;
-  }
-  static delta(date1: number, date2: number | null = null) {
-    if (date2) {
-      return date2 - date1;
-    } else {
-      return date1 - Date.now();
-    }
-  }
-  static get now() {
-    return Date.now();
-  }
-}
-
 export const get = {
   ok: 12,
   secret: () => {
@@ -378,6 +322,62 @@ const make = {
     return result;
   },
 };
+
+// returns number in milliseconds format
+export class Time {
+  date: Date;
+  constructor(dateMS?: number) {
+    this.date = dateMS ? new Date(dateMS) : new Date();
+  }
+  delta(date2: number | null = null, _Date: boolean = false) {
+    const TD = Time.delta(this.date.getTime(), date2);
+    return _Date ? new Date(TD) : TD;
+  }
+  //
+  timed(time?: {
+    year?: number;
+    month?: number;
+    day?: number;
+    hour?: number;
+    minute?: number;
+    second?: number;
+  }) {
+    const tmd = this.date.getTime();
+    let endD = this.date;
+    if (time) {
+      const { year, month, day, hour, minute, second } = time;
+      if (year) {
+        endD = new Date(endD.setFullYear(endD.getFullYear() + year));
+      }
+      if (month) {
+        endD = new Date(endD.setMonth(endD.getMonth() + month));
+      }
+      if (day) {
+        endD = new Date(endD.setDate(endD.getDate() + day));
+      }
+      if (hour) {
+        endD = new Date(endD.setHours(endD.getHours() + hour));
+      }
+      if (minute) {
+        endD = new Date(endD.setMinutes(endD.getMinutes() + minute));
+      }
+      if (second) {
+        endD = new Date(endD.setSeconds(endD.getSeconds() + second));
+      }
+    }
+    return endD;
+  }
+  static delta(date1: number, date2: number | null = null) {
+    if (date2) {
+      return date2 - date1;
+    } else {
+      return date1 - Date.now();
+    }
+  }
+  static get now() {
+    return Date.now();
+  }
+}
 
 // Group of useful or useless decorators
 const at = {
@@ -1318,6 +1318,8 @@ class Router {
 /*
 -------------------------
 use function.apply(),if the function doesn't change anything in "this"
+
+kk
 -------------------------
 */
 const R = new Router(make.ID(7));
@@ -1386,6 +1388,7 @@ const LSocket = {
     }
   },
 };
+
 export class Lycaon extends _r {
   dir: string = "./";
   apt: string;
