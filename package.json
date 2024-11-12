@@ -28,6 +28,11 @@
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
-    "@types/pg": "^8.11.10"
+    "@types/pg": "^8.11.10",
+    "@types/bun": "latest"
+  },
+  "main": "index.js",
+  "peerDependencies": {
+    "typescript": "^5.0.0"
   }
 }
