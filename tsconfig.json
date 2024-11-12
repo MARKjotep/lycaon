@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "Node",
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM"],
+    "outDir": "../../DIST/lycaon",
+    "declarationDir": "../../DIST/lycaon/types",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "noImplicitThis": false,
+    "noImplicitAny": true,
+    "allowJs": true,
+    "checkJs": false,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "declaration": true,
+    "paths": {
+      "*": ["node_modules/*"]
+    },
+    "typeRoots": ["types/types.d.ts", "node_modules/@types"]
+  },
+
+  "include": ["**/*.ts", "types/types.d.ts"],
+  "exclude": [
+    "**/.*",
+    "./**/css",
+    "./**/private",
+    "./css",
+    "*.js",
+    "node_modules"
+  ]
+}

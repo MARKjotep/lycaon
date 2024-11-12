@@ -1,0 +1,24 @@
+{
+  "name": "lycaon",
+  "version": "0.0.1",
+  "description": "lycaon",
+  "author": "Marky <markjotep@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc ; dist=../../DIST/lycaon/ ; cp -r package.json $dist ; cp -r ./types/types.d.ts $dist/types; bun install --cwd $dist; "
+  },
+  "types": "./index.d.ts",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "sweetss": "^1.0.5"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/pg": "^8.11.10"
+  },
+  "keywords": [
+    "ts"
+  ]
+}
