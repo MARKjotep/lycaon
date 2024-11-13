@@ -32,7 +32,8 @@ export const $$ = {
 
 /*
 -------------------------
-
+future --
+Implement CSRF using Authored -- http-only and in header if a page requires post / delete
 
 -------------------------
 */
@@ -915,10 +916,10 @@ class Runner {
               this.X.status = CTX.error as number;
             } else {
               const SS = FS["__session"];
-
               if (SS) {
                 await S.session.saveSession(SS, this.X.headers);
               }
+              //
               return this.push(
                 await this.ctx(
                   CTX,
