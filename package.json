@@ -25,7 +25,8 @@
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1",
-    "sweetss": "^1.0.5"
+    "sweetss": "^1.0.5",
+    "authored": "link:authored"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
@@ -33,6 +34,6 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.6.3"
   }
 }

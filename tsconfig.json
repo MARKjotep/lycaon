@@ -10,6 +10,7 @@
     "baseUrl": ".",
     "noImplicitThis": false,
     "noImplicitAny": true,
+    "strictBindCallApply": true,
     "allowJs": true,
     "checkJs": false,
     "removeComments": true,

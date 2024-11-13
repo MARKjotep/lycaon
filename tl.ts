@@ -1,3 +1,4 @@
+/// <reference path="./types/types.d.ts" />
 import { BunFile, CryptoHasher, file } from "bun";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 
@@ -49,10 +50,18 @@ export const str = {
   buffer(str: string): Buffer {
     return Buffer.from(str);
   },
-  digest(salt: string) {
-    const hmac = new Bun.CryptoHasher("sha256", salt);
-    hmac.update("hello");
+  digest(...salt: (string | Buffer)[]) {
+    const hmac = new Bun.CryptoHasher("sha256", get.secret());
+    salt.forEach((ss) => {
+      hmac.update(ss);
+    });
     return hmac.digest();
+  },
+  stringify(str: object) {
+    return JSON.stringify(str);
+  },
+  parse(str: string) {
+    return JSON.parse(str);
   },
 };
 
@@ -124,8 +133,8 @@ export const path = {
     return lit_type;
   },
   parse: (path: string) => {
+    if (!path.startsWith("/")) path = "/" + path;
     const prsed = path.match(/(?<=\/)[^/].*?(?=\/|$)/g) ?? ["/"];
-
     const [parsed, args] = prsed.reduce<string[][]>(
       (pr, kv) => {
         const [prsd, args] = pr;
@@ -153,6 +162,48 @@ export const path = {
 };
 
 export const html = {
+  attr: (attr: obj<V>) => {
+    return O.items(attr)
+      .reduce<string[]>(
+        (acc, [k, v]) => {
+          acc.push(is.bool(v) ? k : `${k}="${v}"`);
+          return acc;
+        },
+        [""],
+      )
+      .join(" ");
+  },
+  head: (v?: headP) => {
+    if (v) {
+      return O.items(v).reduce<string[]>((acc, [kk, vv]) => {
+        if (is.str(vv)) {
+          acc.push(`<${kk}>${vv}</${kk}>`);
+        } else if (is.arr(vv)) {
+          const rdced = vv.reduce((prv, vl) => {
+            let ender = "";
+            if (kk == "script") {
+              let scrptbdy = "";
+              if ("importmap" in vl) {
+                vl["type"] = "importmap";
+                scrptbdy = JSON.stringify(vl.importmap);
+                delete vl.importmap;
+              } else if ("body" in vl) {
+                scrptbdy = vl.body;
+                delete vl.body;
+              }
+              ender = `${scrptbdy}</${kk}>`;
+            }
+            prv.push(`<${kk}${html.attr(vl)}>${ender}`);
+            return prv;
+          }, []);
+          acc.push(...rdced);
+        }
+
+        return acc;
+      }, []);
+    }
+    return [];
+  },
   cookie: (
     key: string,
     value: string = "",
@@ -205,6 +256,15 @@ export const html = {
         [`${key}=${value}`],
       )
       .join("; ");
+  },
+  html: (_ctx: any, head: string, lang: string) => {
+    const ID = make.ID(5);
+    const hdr = head;
+    let TX = `<!DOCTYPE html><html lang="${lang}">`;
+    TX += `<head>${hdr}</head>`;
+    TX += `<body id="${ID}">${_ctx}</body>`;
+    TX += "</html>";
+    return TX;
   },
 };
 
@@ -279,7 +339,8 @@ export const get = {
         const [kk, vv] = mt;
         if (vv) {
           const ky = kk.replace("TLS_", "").toLowerCase();
-          ob[ky] = file(dir + vv);
+
+          ob[ky] = file(dir + "/" + vv);
         }
         return ob;
       }, {});
@@ -310,3 +371,20 @@ export function decodeSID(name: string) {
   hash.update(bkey);
   return hash.digest("hex");
 }
+
+export const make = {
+  ID: (length: number) => {
+    const { charU, charL, nums } = str;
+    const _chars = charU + charL;
+    let result: string = "",
+      counter: number = 0;
+
+    while (counter < length) {
+      let chars = _chars + (counter == 0 ? "" : nums);
+      const charactersLength = chars.length;
+      result += chars.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+  },
+};

@@ -1,5 +1,5 @@
 import { CryptoHasher, file, write, gzipSync, gunzipSync } from "bun";
-import { str, get, is, html, Time, O, $$ } from "./index";
+import { str, get, is, html, Time, O } from "./tl";
 import { sign, verify } from "jsonwebtoken";
 import { randomBytes } from "node:crypto";
 import { promises as fr } from "node:fs";

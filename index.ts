@@ -11,8 +11,9 @@ import {
   gunzipSync,
   serve,
 } from "bun";
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
-import { JWTInterface, ServerInterface, ServerSide, Seshion } from "./seshion";
+
+import { O, str, is, path, html, get, Time, make } from "./tl";
+import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
 
 export interface obj<T> {
   [Key: string]: T;
@@ -35,359 +36,6 @@ export const $$ = {
 
 -------------------------
 */
-export const O = {
-  vals: Object.values,
-  keys: Object.keys,
-  items: Object.entries,
-  has: Object.hasOwn,
-  define: Object.defineProperty,
-  ass: Object.assign,
-  length: (ob: Object) => {
-    return Object.keys(ob).length;
-  },
-};
-
-const generate = {
-  numSequence: (length: number) => Array.from({ length }).map((_, ind) => ind),
-};
-
-export const str = {
-  charU: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-  charL: "abcdefghijklmnopqrstuvwxyz",
-  nums: generate.numSequence(9).join(""),
-  rbytes: new RegExp(/(\d+)(\d*)/, "m"),
-  strip: (char: string, tostrip: string) => {
-    let _char = char;
-    if (_char.startsWith(tostrip)) {
-      _char = _char.slice(1);
-    }
-    if (_char.endsWith(tostrip)) {
-      _char = _char.slice(0, -1);
-    }
-    return _char;
-  },
-  decode(str: any) {
-    return $$.textD.decode(str);
-  },
-};
-
-export const is = {
-  bool: (v: any) => typeof v === "boolean",
-  str: (v: any) => typeof v === "string",
-  arr: (v: any) => Array.isArray(v),
-  file: async (path: string, data?: string) => {
-    try {
-      return statSync(path).isFile();
-    } catch (err) {
-      if (data !== undefined) writeFileSync(path, Buffer.from(data));
-      return true;
-    }
-  },
-  dir: (path: string) => {
-    try {
-      return statSync(path).isDirectory();
-    } catch (err) {
-      mkdirSync(path, { recursive: true });
-      return true;
-    }
-  },
-  number: (value: any) => {
-    return !isNaN(parseFloat(value)) && isFinite(value);
-  },
-  dict: (val: object) => {
-    return typeof val === "object" && val !== null && !Array.isArray(val);
-  },
-  arraybuff: (val: any) => {
-    return (
-      val instanceof Uint8Array ||
-      val instanceof ArrayBuffer ||
-      typeof val === "string"
-    );
-  },
-};
-
-const path = {
-  type: (wrd: string, isFinal: boolean = false) => {
-    let lit_type: [any, string] | [] = [];
-
-    if (is.number(wrd)) {
-      const nm = wrd;
-      if (Number.isInteger(nm)) {
-        lit_type = [nm, "int"];
-      } else {
-        lit_type = [nm, "float"];
-      }
-    } else {
-      if (isFinal && wrd.includes(".")) {
-        lit_type = [wrd, "file"];
-      } else {
-        let tps = "-";
-        if (wrd.length == 36) {
-          const dashy = wrd.match(/\-/g);
-          if (dashy && dashy.length == 4) {
-            tps = "uuid";
-          } else {
-            tps = "string";
-          }
-        } else if (wrd != "/") {
-          tps = "string";
-        }
-        lit_type = [wrd, tps];
-      }
-    }
-
-    return lit_type;
-  },
-  parse: (path: string) => {
-    const prsed = path.match(/(?<=\/)[^/].*?(?=\/|$)/g) ?? ["/"];
-
-    const [parsed, args] = prsed.reduce<string[][]>(
-      (pr, kv) => {
-        const [prsd, args] = pr;
-        if (kv.includes("<")) {
-          const tgp = kv.match(/(?<=<)[^/].*?(?=>|$)/g);
-          if (tgp?.length) {
-            const [_type, _arg] = tgp[0].split(":");
-            prsd.push(_type);
-            args.push(_arg);
-          }
-        } else {
-          prsd.push(kv);
-        }
-        return pr;
-      },
-      [[], []],
-    );
-
-    if (path.endsWith("/") && path.length > 1) {
-      parsed.push("/");
-    }
-
-    return { parsed, args };
-  },
-};
-
-export const html = {
-  attr: (attr: obj<V>) => {
-    return O.items(attr)
-      .reduce<string[]>(
-        (acc, [k, v]) => {
-          acc.push(is.bool(v) ? k : `${k}="${v}"`);
-          return acc;
-        },
-        [""],
-      )
-      .join(" ");
-  },
-  head: (v?: headP) => {
-    if (v) {
-      return O.items(v).reduce<string[]>((acc, [kk, vv]) => {
-        if (is.str(vv)) {
-          acc.push(`<${kk}>${vv}</${kk}>`);
-        } else if (is.arr(vv)) {
-          const rdced = vv.reduce((prv, vl) => {
-            let ender = "";
-            if (kk == "script") {
-              let scrptbdy = "";
-              if ("importmap" in vl) {
-                vl["type"] = "importmap";
-                scrptbdy = JSON.stringify(vl.importmap);
-                delete vl.importmap;
-              } else if ("body" in vl) {
-                scrptbdy = vl.body;
-                delete vl.body;
-              }
-              ender = `${scrptbdy}</${kk}>`;
-            }
-            prv.push(`<${kk}${html.attr(vl)}>${ender}`);
-            return prv;
-          }, []);
-          acc.push(...rdced);
-        }
-
-        return acc;
-      }, []);
-    }
-    return [];
-  },
-  cookie: (
-    key: string,
-    value: string = "",
-    {
-      maxAge,
-      expires,
-      path,
-      domain,
-      secure,
-      httpOnly,
-      sameSite,
-    }: {
-      maxAge?: Date | number;
-      expires?: Date | string | number;
-      path?: string | null;
-      domain?: string;
-      secure?: boolean;
-      httpOnly?: boolean;
-      sameSite?: string | null;
-      sync_expires?: boolean;
-      max_size?: number;
-    },
-  ) => {
-    if (maxAge instanceof Date) {
-      maxAge = maxAge.getSeconds();
-    }
-
-    if (expires instanceof Date) {
-      expires = expires.toUTCString();
-    } else if (expires === 0) {
-      expires = new Date().toUTCString();
-    }
-
-    const cprops = [
-      ["Domain", domain],
-      ["Expires", expires],
-      ["Max-Age", maxAge],
-      ["Secure", secure],
-      ["HttpOnly", httpOnly],
-      ["Path", path],
-      ["SameSite", sameSite],
-    ];
-
-    return cprops
-      .reduce<string[]>(
-        (acc, [kk, v]) => {
-          if (v !== undefined) acc.push(`${kk}=${v}`);
-          return acc;
-        },
-        [`${key}=${value}`],
-      )
-      .join("; ");
-  },
-};
-
-export const get = {
-  ok: 12,
-  secret: () => {
-    const sk = process.env.SECRET_KEY;
-    if (!sk) throw new Error("'SECRET_KEY' not found in .env file");
-    return sk;
-  },
-  tls: (dir: string) => {
-    return O.items(process.env)
-      .filter((k) => {
-        if (k[0].startsWith("TLS_")) return k;
-      })
-      .reduce<obj<BunFile>>((ob, mt) => {
-        const [kk, vv] = mt;
-        if (vv) {
-          const ky = kk.replace("TLS_", "").toLowerCase();
-          ob[ky] = file(dir + vv);
-        }
-        return ob;
-      }, {});
-  },
-  byteRange: (fsize: number, range: string) => {
-    let start = 0;
-    let end = fsize - 1;
-    const [partialStart, partialEnd] = range.replace(/bytes=/, "").split("-");
-    //
-    start = parseInt(partialStart, 10);
-    end = partialEnd ? parseInt(partialEnd, 10) : end;
-    return [start, end, fsize];
-  },
-  mimeType: (fileStr: string) => {
-    return file(fileStr).type;
-  },
-  args: (params: string[], vals: string[]) => {
-    return params.reduce<obj<string>>((k, v, i) => {
-      k[v] = vals[i];
-      return k;
-    }, {});
-  },
-};
-
-const make = {
-  ID: (length: number) => {
-    const { charU, charL, nums } = str;
-    const _chars = charU + charL;
-    let result: string = "",
-      counter: number = 0;
-
-    while (counter < length) {
-      let chars = _chars + (counter == 0 ? "" : nums);
-      const charactersLength = chars.length;
-      result += chars.charAt(Math.floor(Math.random() * charactersLength));
-      counter += 1;
-    }
-    return result;
-  },
-};
-
-// returns number in milliseconds format
-export class Time {
-  date: Date;
-  constructor(dateMS?: number) {
-    this.date = dateMS ? new Date(dateMS) : new Date();
-  }
-  delta(date2: number | null = null, _Date: boolean = false) {
-    const TD = Time.delta(this.date.getTime(), date2);
-    return _Date ? new Date(TD) : TD;
-  }
-  //
-  timed(time?: {
-    year?: number;
-    month?: number;
-    day?: number;
-    hour?: number;
-    minute?: number;
-    second?: number;
-  }) {
-    const tmd = this.date.getTime();
-    let endD = this.date;
-    if (time) {
-      const { year, month, day, hour, minute, second } = time;
-      if (year) {
-        endD = new Date(endD.setFullYear(endD.getFullYear() + year));
-      }
-      if (month) {
-        endD = new Date(endD.setMonth(endD.getMonth() + month));
-      }
-      if (day) {
-        endD = new Date(endD.setDate(endD.getDate() + day));
-      }
-      if (hour) {
-        endD = new Date(endD.setHours(endD.getHours() + hour));
-      }
-      if (minute) {
-        endD = new Date(endD.setMinutes(endD.getMinutes() + minute));
-      }
-      if (second) {
-        endD = new Date(endD.setSeconds(endD.getSeconds() + second));
-      }
-    }
-    return endD;
-  }
-  static delta(date1: number, date2: number | null = null) {
-    if (date2) {
-      return date2 - date1;
-    } else {
-      return date1 - Date.now();
-    }
-  }
-  static get now() {
-    return Date.now();
-  }
-}
-
-// Group of useful or useless decorators
-const at = {
-  readOnly: (target: any, key: string | symbol) => {
-    O.define(target, key, {
-      writable: false,
-      configurable: false,
-    });
-  },
-};
 
 /*
 -------------------------
@@ -450,9 +98,13 @@ class request {
   req: Request;
   server?: Server;
   formData?: FormData;
+  headers: Headers;
+  url: URL;
   constructor(req: Request, server?: Server) {
     this.req = req;
     this.server = server;
+    this.headers = req.headers ?? new Headers();
+    this.url = new URL(req.url);
   }
   get auth() {
     const auth = this.headers.get("authorization");
@@ -489,9 +141,6 @@ class request {
     }
     return new FormData();
   }
-  get headers(): Headers {
-    return this.req.headers ?? new Headers();
-  }
   get ip() {
     return this.server?.requestIP(this.req) ?? "";
   }
@@ -522,17 +171,18 @@ class request {
   get range() {
     return this.headers.get("range") ?? undefined;
   }
-  get url() {
-    return new URL(this.req.url);
-  }
   async authgroup() {
     const { cookies, auth } = this;
     let sid = cookies.session ?? "";
     let jwtv = auth ?? "";
+    let refreshjwt: string = "";
 
-    const tf = await this.form();
-    const rt = tf.get("refresh_token");
-    let refreshjwt: string = rt ? rt.toString() : "";
+    const tf = this.isForm ? await this.form() : undefined;
+    if (tf) {
+      const rt = tf.get("refresh_token");
+      refreshjwt = rt ? rt.toString() : "";
+    }
+
     return { sid, jwtv, refreshjwt };
   }
   get upgrade() {
@@ -580,7 +230,7 @@ class eStream {
       retry?: number;
       end?: boolean;
     },
-    interval: number = 3000,
+    interval: number = 2000,
   ) {
     if (this.ctrl) {
       const intervalID = setInterval(
@@ -602,7 +252,7 @@ class eStream {
             end && this.close();
           }
         },
-        interval > 2000 ? interval : 2000,
+        interval > 1000 ? interval : 1000,
       );
       this.intervalID.push(intervalID);
     }
@@ -639,7 +289,7 @@ export class response extends _r {
   async eventStream?(...args: any[]): Promise<any>;
   get session() {
     if (!this.__session) {
-      this.__session = S.session.session();
+      this.__session = S.session.new;
     }
     return this.__session;
   }
@@ -648,7 +298,7 @@ export class response extends _r {
   }
   get jwt() {
     if (!this.__jwt) {
-      this.__jwt = S.jwt.session();
+      this.__jwt = S.jwt.new;
     }
     return this.__jwt;
   }
@@ -739,10 +389,12 @@ export class wss {
 these are really not exposed --- so, I'm not sure what's the best way to store these.
 -------------------------
 */
-const PRoutes: obj<any> = {};
-const FRoutes: obj<any> = {};
-const WRoutes: obj<any> = {};
-const ZFolders: obj<any> = {};
+
+const Paths: Map<string, Yurl> = new Map();
+const FPaths: Map<string, Yurl> = new Map();
+const WPaths: Map<string, Yurl> = new Map();
+const ZPaths: Map<string, obj<string>> = new Map();
+const TPS = ["string", "int", "float", "file", "uuid"];
 
 class Yurl {
   _class: typeof response | typeof wss | null;
@@ -779,7 +431,6 @@ class Yurl {
     this._class = _class;
     this.isFile = isFile;
     this.isWS = isWS;
-
     if (isFile) {
       this.preload = preload;
       this.withSession = withSession;
@@ -801,12 +452,12 @@ class Yurl {
 }
 
 class Xurl {
-  Yurl?: Yurl | null;
+  Yurl?: Yurl;
   status: number = 404;
-  x_args: string[] = [];
-  headers: obj<string> = {
+  x_args: string[];
+  headers: Headers = new Headers({
     "Content-Type": "text/plain",
-  };
+  });
   constructor(
     {
       Yurl,
@@ -822,16 +473,124 @@ class Xurl {
     O.ass(this, {
       Yurl,
       status,
-      headers,
     });
-
-    x_args && (this.x_args = x_args);
+    if (headers) this.header = headers;
+    this.x_args = x_args ?? [];
   }
   set header(head: obj<string>) {
-    O.ass(this.headers, head);
+    O.items(head).forEach(([k, v]) => {
+      this.headers.set(k, v);
+    });
   }
   set type(content: string) {
-    O.ass(this.headers, { "Content-Type": content });
+    this.headers.set("Content-Type", content);
+  }
+  gzip(ctx: Uint8Array | string | ArrayBuffer) {
+    const buffd = gzipSync(ctx);
+    this.header = {
+      "Content-Length": buffd.byteLength.toString(),
+      "Content-Encoding": "gzip",
+    };
+    return buffd;
+  }
+}
+
+class Router {
+  id: string;
+  apt: string = "";
+  headstr: string = "";
+  constructor(id: string) {
+    this.id = id;
+  }
+  set route(yurl: Yurl) {
+    const { url, isFile, isWS, parsedURL, _class } = yurl;
+    let RT = isWS ? WPaths : isFile ? FPaths : Paths;
+    const sp = str.stringify(parsedURL);
+    const ISP = RT.get(sp);
+    if (!ISP) {
+      RT.set(sp, yurl);
+    } else {
+      if (!isFile) {
+        throw `URL: ${url} already used in class < ${_class!.name} >`;
+      }
+    }
+  }
+  folder(path: string, option = {}) {
+    path = str.strip(path, ".");
+    path = str.strip(path, "/");
+    ZPaths.set(path, option);
+  }
+  private isFile(
+    isFile: boolean,
+    { parsed, _path }: { parsed: string[]; _path?: string },
+  ) {
+    if (isFile) {
+      const pp = parsed.slice(0, -1).join("/");
+      let fses = false;
+      const fldrs = [...ZPaths.keys()];
+      const inFolder = fldrs.some((ff) => {
+        if (pp.startsWith(ff)) {
+          const zp = ZPaths.get(ff);
+          fses = zp ? !!zp.session : false;
+        }
+        return pp.startsWith(ff);
+      });
+      if (inFolder) {
+        return new Xurl({
+          Yurl: new Yurl({
+            url: `.${_path}`,
+            isFile: true,
+            withSession: fses,
+          }),
+          status: 200,
+        });
+      }
+    }
+    return new Xurl({});
+  }
+  get({
+    parsed,
+    wss = false,
+    _path,
+  }: {
+    parsed: string[];
+    wss?: boolean;
+    _path?: string;
+  }) {
+    let isFile: boolean = false;
+    const ppop = parsed.slice().pop();
+    if (ppop) isFile = path.type(ppop, true).pop() == "file";
+    const args: string[] = [];
+    const RT = wss ? WPaths : isFile ? FPaths : Paths;
+    let YURL: Yurl | undefined = RT.get(str.stringify(parsed));
+    //
+    if (!YURL) {
+      const mtch: string[] = [];
+      for (const rr of RT.keys()) {
+        const STP = str.parse(rr) as string[];
+        const STLen = STP.length;
+        if (parsed.length === STLen) {
+          for (let i = 0; i < STLen; i++) {
+            if (STP[i] === parsed[i]) {
+              mtch[i] = parsed[i];
+            } else {
+              const STT = STP[i];
+              if (TPS.includes(STT)) {
+                mtch[i] = STP[i];
+                args.push(parsed[i]);
+              }
+            }
+          }
+        }
+      }
+      YURL = RT.get(str.stringify(mtch));
+    }
+
+    //
+    if (YURL) {
+      //
+      return new Xurl({ Yurl: YURL, status: 200 }, args);
+    } else return this.isFile(isFile, { parsed, _path });
   }
 }
 
@@ -853,49 +612,75 @@ export class Fsyt {
   }
 }
 
-class fileXP {
-  Y: Yurl;
-  X: Xurl;
-  range?: string;
-  apt: string;
-  constructor(X: Xurl, Y: Yurl, apt: string, range?: string) {
-    this.X = X;
-    this.Y = Y;
-    this.range = range;
-    this.apt = apt;
-    //
+class Session {
+  session!: AuthInterface;
+  jwt!: AuthInterface;
+  jwtInt!: JWTInterface;
+  constructor() {
+    this.jwtInt = new JWTInterface();
   }
-  gzip(ctx: Uint8Array | string | ArrayBuffer) {
-    const buffd = gzipSync(ctx);
-    this.X.header = {
-      "Content-Length": buffd.byteLength.toString(),
-      "Content-Encoding": "gzip",
-    };
-    return buffd;
+  init(sh: Auth) {
+    this.session = sh.session;
+    this.jwt = sh.jwt;
+  }
+}
+
+/*
+-------------------------
+
+-------------------------
+*/
+type responseBody =
+  | string
+  | Uint8Array
+  | ArrayBuffer
+  | ReadableStream<Uint8Array>
+  | null;
+
+class Runner {
+  req: request;
+  X: Xurl;
+  Y?: Yurl;
+  isWSS: boolean;
+  x_args: string[];
+  method: string;
+  constructor(req: Request, server?: Server) {
+    this.req = new request(req, server);
+    const { upgrade, parsed, method, path } = this.req;
+    this.isWSS = !!upgrade;
+    this.X = R.get({ parsed, wss: this.isWSS, _path: path });
+    const { Yurl, x_args } = this.X;
+    this.Y = Yurl;
+    this.x_args = x_args;
+    this.method = method;
+  }
+  push(body: responseBody = "", _status?: number) {
+    const { status, headers } = this.X;
+    return new Response(body, { status: _status ?? status, headers });
   }
   file(bytes: Uint8Array | BunFile, size: number, fileType: string) {
     this.X.type = fileType;
-    if (this.range) {
-      const [_s, _e, _z] = get.byteRange(size, this.range);
+    const range = this.req.range;
+    if (range) {
+      const [_s, _e, _z] = get.byteRange(size, range);
       this.X.header = {
         "Content-Range": `bytes ${_s}-${_e}/${_z}`,
         "Content-Length": size.toString(),
       };
       this.X.status = 206;
-      //
       return bytes.slice(_s, _e + 1);
     } else {
       this.X.header = { "Cache-Control": "max-age=31536000" };
-      return is.arraybuff(bytes) ? this.gzip(bytes) : bytes;
+      return is.arraybuff(bytes) ? this.X.gzip(bytes) : bytes;
     }
   }
-  async response() {
-    const { url, bytes, fileType } = this.Y;
+  async isFile() {
+    const { url, bytes, fileType } = this.Y!;
     let CTX: string | Uint8Array | BunFile = url + " file note found.";
     if (bytes) {
       CTX = this.file(bytes, bytes.byteLength, fileType);
     } else {
-      const FL = file(this.apt + url);
+      const FL = file(R.apt + url);
       if (await FL.exists()) {
         const isMedia = fileType.startsWith("video/");
         CTX = this.file(isMedia ? FL : await FL.bytes(), FL.size, fileType);
@@ -907,262 +692,18 @@ class fileXP {
     const { headers, status } = this.X;
     return new Response(CTX, { headers, status });
   }
-}
-
-class ctxXP {
-  X: Xurl;
-  constructor(X: Xurl) {
-    this.X = X;
-  }
-  gzip(ctx: Uint8Array | string | ArrayBuffer, headers: obj<string>) {
-    const buffd = gzipSync(ctx);
-    O.ass(headers, {
-      "Content-Length": buffd.byteLength,
-      "Content-Encoding": "gzip",
-    });
-    return buffd;
-  }
-  html(CTX: any, head: string, lang: string) {
-    //
-    let bscr = "",
-      _ctx = "";
-
-    if (CTX instanceof Fsyt) {
-      bscr = CTX._head();
-    } else {
-      _ctx = CTX;
-    }
-
-    const ID = make.ID(5);
-    const hdr = head + bscr;
-    let TX = `<!DOCTYPE html><html lang="${lang}">`;
-    TX += `<head>${hdr}</head>`;
-    TX += `<body id="${ID}">${_ctx}</body>`;
-    TX += "</html>";
-
-    this.X.type = "text/html";
-    const { status, headers } = this.X;
-
-    return new Response(this.gzip(TX, headers), {
-      status,
-      headers,
-    });
-  }
-  response(CTX: any, head: string, lang: string, _status?: number) {
-    if (CTX instanceof Response) {
-      return CTX;
-    } else if (is.dict(CTX) && !(CTX instanceof Fsyt)) {
-      //
-      this.X.type = "application/json";
-      const { status, headers } = this.X;
-
-      return new Response(this.gzip(JSON.stringify(CTX), headers), {
-        status: _status ?? status,
-        headers,
-      });
-    } else return this.html(CTX, head, lang);
-  }
-  async jwt(
-    JWT: ServerSide,
-    jwtv?: string,
-    refreshjwt?: string,
-    _status?: number,
-  ) {
-    let resp = {};
-
-    const err = (error: string) => {
-      this.X.status = 403;
-      resp = {
-        error,
-      };
-    };
-
-    const ref = async (_JWT: ServerSide) => {
-      const FJWT = S.jwtInt.save(_JWT);
-      _JWT.access_token = FJWT;
-      await S.jwt.saveSession(_JWT, this.X);
-      resp = {
-        access_token: FJWT,
-        refresh_token: _JWT.sid,
-        status: "ok",
-      };
-    };
-
-    if (refreshjwt) {
-      const rjwt = await S.jwt.openSession(refreshjwt);
-      const RTK = rjwt.data.access_token;
-      if (jwtv == RTK) {
-        // change this -- it's using the accee_token instead of the refresh_token life
-        if (S.jwtInt.verify(RTK, { days: 5 })) {
-          await ref(rjwt);
-        } else {
-          await S.jwt.saveSession(rjwt, null, true);
-          err("expired refresh_token");
-        }
-        //
-      } else {
-        err("tokens don't match.");
-      }
-      //
-    } else if (!jwtv && JWT.modified) {
-      await ref(JWT);
-    } else {
-      // Return no content
-      this.X.status = 204;
-    }
-    //
-    this.X.type = "application/json";
-    const { status, headers } = this.X;
-    return new Response(this.gzip(JSON.stringify(resp), headers), {
-      status: _status ?? status,
-      headers,
-    });
-  }
-}
-
-class Session {
-  session!: ServerInterface;
-  jwt!: ServerInterface;
-  jwtInt!: JWTInterface;
-  constructor() {
-    this.jwtInt = new JWTInterface();
-  }
-  init(sh: Seshion) {
-    this.session = sh.session;
-    this.jwt = sh.jwt;
-  }
-  get() {}
-}
-
-class Router {
-  id: string;
-  apt: string = "";
-  headstr: string = "";
-  constructor(id: string) {
-    this.id = id;
-  }
-  set route(yurl: Yurl) {
-    const { url, isFile, isWS, parsedURL } = yurl;
-    let RT = isWS ? WRoutes : isFile ? FRoutes : PRoutes;
-    const RID = this.id;
-    parsedURL.forEach((v, i) => {
-      if (!(v in RT)) RT[v] = {};
-      RT = RT[v];
-      if (parsedURL.length - 1 == i) {
-        if (!(RID in RT)) {
-          isFile && yurl.loadbytes(this.apt);
-          RT[RID] = yurl;
-        } else {
-          if (!isFile) {
-            throw `URL: ${url} already used in class < ${RT[RID]._class.name} >`;
-          }
-        }
-      }
-    });
-  }
-  folder(path: string, option = {}) {
-    path = str.strip(path, ".");
-    path = str.strip(path, "/");
-    if (!(path in ZFolders)) {
-      ZFolders[path] = option;
-    }
-  }
-  get({ parsed, wss = false }: { parsed: string[]; wss?: boolean }) {
-    let isFile: boolean = false;
-    let ppop = parsed.slice().pop();
-    if (ppop) isFile = path.type(ppop, true).pop() == "file";
-
-    const lenn = parsed.length;
-    const args: string[] = [];
-    let routeUpdate: number = 0;
-    let RT = wss ? WRoutes : isFile ? FRoutes : PRoutes;
-
-    parsed.forEach((v, i) => {
-      const TP = path.type(v, lenn - 1 == i ? true : false);
-      for (let i = 0; i < TP.length; i++) {
-        let TPX = TP[i];
-        if (TPX in RT) {
-          RT = RT[TPX];
-          routeUpdate += 1;
-          break;
-        } else {
-          if (TPX != "/" && TPX != "-") {
-            args.push(TPX);
-          }
-        }
-      }
-    });
-
-    if (routeUpdate != lenn) {
-      RT = {};
-    }
-
-    if (this.id in RT) {
-      return new Xurl({ Yurl: RT[this.id], status: 200 }, args);
-    } else if (isFile) {
-      const pp = parsed.slice(0, -1).join("/");
-      let fses = false;
-      const inFolder = O.items(ZFolders).some(([ff, vv]) => {
-        fses = vv.session ?? false;
-        return pp.startsWith(ff);
-      });
-
-      if (inFolder) {
-        //
-        return new Xurl({
-          Yurl: new Yurl({
-            url: `.${path}`,
-            isFile: true,
-            withSession: fses,
-          }),
-          status: 200,
-        });
-      }
-    }
-    return new Xurl({});
-  }
-  async auth(FS: response, z_args: obj<string>, grp: obj<string> = {}) {
-    const a_args: obj<boolean> = {};
-    const { sid, jwtv, refreshjwt } = grp;
-    if (sid) {
-      FS.session = await S.session.openSession(sid);
-      if (!FS.session.new) {
-        a_args["session"] = true;
-      }
-    }
-    if (jwtv) {
-      FS.jwt = S.jwtInt.open(jwtv, { hours: 6 });
-
-      if (!FS.jwt.new) {
-        a_args["jwt"] = true;
-      }
-
-      if (refreshjwt) {
-        const rjwt = await S.jwt.openSession(refreshjwt);
-        if (!rjwt.new) {
-          a_args["jwt_refresh"] = true;
-        }
-      }
-    }
-
-    if (O.length(a_args)) {
-      O.ass(z_args, a_args);
-    }
-  }
-  async upgrade(req: request) {
-    const X = this.get({ parsed: req.parsed, wss: true });
-    const { Yurl, headers, x_args } = X;
+  async upgrade() {
+    const { Yurl, headers, x_args } = this.X;
     let status = 500;
     if (Yurl) {
       const { url, _class, args, broadcastWSS, maxClient, withSession } = Yurl;
-
       if (_class) {
         let allowUpgrade = true;
 
         const z_args = get.args(args, x_args);
-        const FS = new _class(req) as wss;
+        const FS = new _class(this.req) as wss;
 
-        const { sid } = await req.authgroup();
+        const { sid } = await this.req.authgroup();
 
         if (withSession) {
           if (sid) {
@@ -1193,7 +734,7 @@ class Router {
         }
 
         allowUpgrade &&
-          req.upgraded({
+          this.req.upgraded({
             data: {
               wclass: FS,
               z_args,
@@ -1202,11 +743,110 @@ class Router {
           });
       }
     }
-
     return new Response("upgrade error", { status, headers });
   }
-  async estream(req: request, FS: response, X: Xurl, z_args: obj<string>) {
-    X.header = {
+  async auth(FS: response, z_args: obj<string>) {
+    const a_args: obj<boolean> = {};
+
+    const { sid, jwtv, refreshjwt } = await this.req.authgroup();
+
+    if (sid) {
+      FS.session = await S.session.openSession(sid);
+      if (!FS.session.new) {
+        a_args["session"] = true;
+      }
+    }
+    if (jwtv) {
+      FS.jwt = S.jwtInt.open(jwtv, { hours: 6 });
+
+      if (!FS.jwt.new) {
+        a_args["jwt"] = true;
+      }
+
+      if (refreshjwt) {
+        const rjwt = await S.jwt.openSession(refreshjwt);
+        if (!rjwt.new) {
+          a_args["jwt_refresh"] = true;
+        }
+      }
+    }
+    if (O.length(a_args)) {
+      O.ass(z_args, a_args);
+    }
+
+    return;
+  }
+  async ctx(CTX: any, head: string, lang: string, _status?: number) {
+    if (CTX instanceof Response) {
+      this.X.status = CTX.status;
+      this.X.header = CTX.headers.toJSON();
+      return await CTX.arrayBuffer();
+    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Fsyt)) {
+      //
+      this.X.type = "application/json";
+      return this.X.gzip(JSON.stringify(CTX));
+    } else {
+      let bscr = "",
+        _ctx = "";
+      if (CTX instanceof Fsyt) {
+        bscr = CTX._head();
+      } else {
+        _ctx = CTX as string;
+      }
+      this.X.type = "text/html";
+      const _HT = html.html(_ctx, head + bscr, lang);
+      return this.X.gzip(_HT);
+    }
+  }
+  async jwt(JWT: ServerSide) {
+    const { jwtv, refreshjwt } = await this.req.authgroup();
+    let resp = {};
+    const err = (error: string) => {
+      this.X.status = 403;
+      resp = {
+        error,
+      };
+    };
+    const ref = async (_JWT: ServerSide) => {
+      const FJWT = S.jwtInt.save(_JWT);
+      _JWT.access_token = FJWT;
+      await S.jwt.saveSession(_JWT, this.X.headers);
+      resp = {
+        access_token: FJWT,
+        refresh_token: _JWT.sid,
+        status: "ok",
+      };
+    };
+
+    if (refreshjwt) {
+      const rjwt = await S.jwt.openSession(refreshjwt);
+      const RTK = rjwt.data.access_token;
+      if (jwtv == RTK) {
+        // change this -- it's using the accee_token instead of the refresh_token life
+        if (S.jwtInt.verify(RTK, { days: 5 })) {
+          await ref(rjwt);
+        } else {
+          await S.jwt.saveSession(rjwt, undefined, true);
+          err("expired refresh_token");
+        }
+        //
+      } else {
+        err("tokens don't match.");
+      }
+      //
+    } else if (!jwtv && JWT.modified) {
+      await ref(JWT);
+    } else {
+      // Return no content
+      this.X.status = 204;
+    }
+    //
+    this.X.type = "application/json";
+
+    return this.X.gzip(JSON.stringify(resp));
+  }
+  async estream(req: request, FS: response, z_args: obj<string>) {
+    this.X.header = {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
@@ -1215,7 +855,8 @@ class Router {
     FS.stream = new eStream();
     const CTX = await FS["eventStream"]!(z_args);
     if (is.dict(CTX) && "error" in CTX) {
-      return new Response("", { status: CTX.error });
+      this.X.status = CTX.error;
+      return "";
     }
     //
     const stream = new ReadableStream({
@@ -1231,87 +872,71 @@ class Router {
         });
       },
     });
-
-    return new Response(stream, { headers: X.headers });
+    return stream;
   }
-  async response(req: request) {
-    const { parsed, method, isEventStream } = req;
-    const X = this.get({ parsed });
-    const { Yurl, x_args } = X;
-    if (Yurl) {
-      const { isFile, _class, args } = Yurl;
-      const { sid, jwtv, refreshjwt } = await req.authgroup();
+  async response() {
+    if (this.isWSS) return await this.upgrade();
+    /*
+    -------------------------
+    
+    -------------------------
+    */
+    if (this.Y) {
+      const { isFile, _class, args } = this.Y;
       if (isFile) {
-        /*
-        -------------------------
-        Process all the sesions or anything here before returning the FileRouter
-        -------------------------
-        */
-        // include the apt
-        return await new fileXP(X, Yurl, this.apt, req.range).response();
+        //
+        return this.isFile();
       } else if (_class) {
-        /*
-        -------------------------
-        What if can just combine WSS and RESPONSE here by checking the instance that created it?
-        -------------------------
-        */
-        const FS = new _class(req) as response;
+        //
+        const FS = new _class(this.req) as response;
+        const z_args = get.args(args, this.x_args);
+        // check for valid session or jwt and return error: code if not.
 
-        const z_args = get.args(args, x_args);
-        await this.auth(FS, z_args, { sid, jwtv, refreshjwt });
-        if (isEventStream && typeof FS["eventStream"] === "function") {
+        await this.auth(FS, z_args);
+
+        if (this.req.isEventStream && typeof FS["eventStream"] === "function") {
           // return
-
-          return await this.estream(req, FS, X, z_args);
-        } else if (typeof FS[method] === "function") {
-          const CTX = await FS[method](z_args);
-          // Reassign the proccesses happened in method calls
-          const { header, status, head, lang } = FS;
-
-          X.header = header;
+          return this.push(await this.estream(this.req, FS, z_args));
+        } else if (typeof FS[this.method] === "function") {
+          const CTX = await FS[this.method](z_args);
           //
+          const { header, status, head, lang } = FS;
+          //
+          this.X.header = header;
+          //
+          // Process CTX
           if (CTX) {
-            if (method === "post" && CTX instanceof ServerSide) {
+            //
+            if (this.method === "post" && CTX instanceof ServerSide) {
               //
-              return await new ctxXP(X).jwt(CTX, jwtv, refreshjwt, status);
+              return this.push(await this.jwt(CTX), status);
             } else if (is.dict(CTX) && "error" in CTX) {
               //
-              X.status = CTX.error as number;
+              this.X.status = CTX.error as number;
             } else {
-              /*
-              -------------------------
-              Check the session
-              -------------------------
-              */
               const SS = FS["__session"];
+
               if (SS) {
-                if (SS.modified) {
-                  await S.session.saveSession(SS, X);
-                } else if (sid && SS.new) {
-                  S.session.deleteBrowserSession(SS, X);
-                }
+                await S.session.saveSession(SS, this.X.headers);
               }
-              //
-              return new ctxXP(X).response(
-                CTX,
-                this.headstr + html.head(head).join(""),
-                lang,
+              return this.push(
+                await this.ctx(
+                  CTX,
+                  Lycaon.headstr + html.head(head).join(""),
+                  lang,
+                ),
                 status,
               );
-              // Process CTX now
             }
-            //
           } else {
             // No response -- could be 204 - unless FS.status has value, return 204 - no Content
-            X.status = status ?? 204;
+            this.X.status = status ?? 204;
           }
         }
+        //
       }
-      //
     }
-
-    const { status, headers } = X;
-    return new Response("", { status, headers });
+    return this.push();
   }
 }
 
@@ -1390,34 +1015,36 @@ const LSocket = {
 };
 
 export class Lycaon extends _r {
+  static headstr: string = "";
   dir: string = "./";
   apt: string;
-
   constructor(
     dir: string,
-    options: { envPath?: string; appDir?: string; session?: Seshion } = {},
+    options: { envPath?: string; appDir?: string; session?: Auth } = {},
   ) {
     super();
-    this.dir = dir + "/";
-    const PRIV = this.dir + ".private";
+    this.dir = dir;
+    const PRIV = this.dir + "/.private";
     const { envPath, appDir, session } = options;
     //
     if (!envPath) {
       is.dir(PRIV);
       is.file(PRIV + "/.env", `SECRET_KEY="${make.ID(20)}"`);
     }
-    this.apt = this.dir + (appDir ?? "app") + "/";
+    this.apt = dir + "/" + (appDir ?? "app") + "/";
+
     R.apt = this.apt;
     //
     require("dotenv").config({
       path: (envPath ? envPath : PRIV) + "/.env",
     });
     //
-    const SH = session ?? new Seshion("cached");
-    S.init(SH.init(this.dir));
+
+    const SH = session ?? new Auth({ dir: this.dir });
+    S.init(SH);
 
     //
-    this.file("./fsyt.js", { preload: true });
+    this.file("./fsyt.js");
     //
   }
   /**
@@ -1437,13 +1064,17 @@ export class Lycaon extends _r {
       preload: false,
     },
   ) {
+    const fs = str.strip(furl, ".");
+    let rr = fs.startsWith("/") ? fs : "/" + fs;
+
     R.route = new Yurl({
-      url: furl,
+      url: rr,
       isFile: true,
       withSession: option.session,
       preload: option.preload,
     });
-    return furl;
+
+    return rr;
   }
   wss(
     url: string,
@@ -1490,16 +1121,13 @@ export class Lycaon extends _r {
     hostname ??= "127.0.0.1";
     port ??= 3000;
 
-    R.headstr = html.head(this.head).join("");
+    Lycaon.headstr = html.head(this.head).join("");
 
     if (url) {
-      const RQ = new request({
+      const CTX = await new Runner({
         url: `http://${hostname}:${port}${url ?? "/"}`,
         method: method,
-      } as Request);
-      //
-
-      const CTX = await R.response(RQ);
+      } as Request).response();
       const ARB = await CTX.arrayBuffer();
       ARB.byteLength && write(this.apt + "index.html", gunzipSync(ARB));
 
@@ -1511,9 +1139,9 @@ export class Lycaon extends _r {
         tls: get.tls(this.dir),
         ...(hostname && { hostname }),
         fetch: async (req, server) => {
-          const RQ = new request(req, server);
-          // return RQ.upgrade ? await R.upgrade(RQ) : await R.response(RQ);
-          return RQ.upgrade ? await R.upgrade(RQ) : await R.response(RQ);
+          //
+
+          return await new Runner(req, server).response();
         },
         websocket: {
           sendPings: true,
