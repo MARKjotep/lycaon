@@ -71,19 +71,15 @@ export const is = {
   arr: (v: any) => Array.isArray(v),
   file: async (path: string, data?: string) => {
     try {
-      return statSync(path).isFile();
-    } catch (err) {
-      if (data !== undefined) writeFileSync(path, Buffer.from(data));
-      return true;
+      writeFileSync(path, data ?? "", { flag: "wx" });
+    } catch (error) {
+      //
     }
+    return true;
   },
   dir: (path: string) => {
-    try {
-      return statSync(path).isDirectory();
-    } catch (err) {
-      mkdirSync(path, { recursive: true });
-      return true;
-    }
+    mkdirSync(path, { recursive: true });
+    return true;
   },
   number: (value: any) => {
     return !isNaN(parseFloat(value)) && isFinite(value);

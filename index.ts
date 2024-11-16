@@ -11,9 +11,10 @@ import {
   gunzipSync,
   serve,
 } from "bun";
-
+import { config } from "dotenv";
 import { O, str, is, path, html, get, Time, make } from "./tl";
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
+import { writeFile, writeFileSync } from "fs";
 
 export interface obj<T> {
   [Key: string]: T;
@@ -96,14 +97,14 @@ RESPONSE = REQUEST = WSS
 */
 
 class request {
-  req: Request;
-  server?: Server;
   formData?: FormData;
   headers: Headers;
   url: URL;
-  constructor(req: Request, server?: Server) {
-    this.req = req;
-    this.server = server;
+  __cookies: obj<string> = {};
+  constructor(
+    public req: Request,
+    public server?: Server,
+  ) {
     this.headers = req.headers ?? new Headers();
     this.url = new URL(req.url);
   }
@@ -123,15 +124,17 @@ class request {
     return this.headers.get("content-type");
   }
   get cookies() {
-    const cookie = this.headers.get("cookie");
-    if (cookie) {
-      return cookie.split(";").reduce<obj<string>>((ob, d) => {
-        const [key, val] = d.trim().split(/=(.*)/s);
-        ob[key] = val;
-        return ob;
-      }, {});
+    if (!O.length(this.__cookies)) {
+      const cookie = this.headers.get("cookie");
+      if (cookie) {
+        this.__cookies = cookie.split(";").reduce<obj<string>>((ob, d) => {
+          const [key, val] = d.trim().split(/=(.*)/s);
+          ob[key] = val;
+          return ob;
+        }, {});
+      }
     }
-    return {};
+    return this.__cookies;
   }
   async form(): Promise<FormData> {
     if (this.isForm) {
@@ -173,7 +176,7 @@ class request {
     return this.headers.get("range") ?? undefined;
   }
   async authgroup() {
-    const { cookies, auth } = this;
+    const { cookies: cookies, auth } = this;
     let sid = cookies.session ?? "";
     let jwtv = auth ?? "";
     let refreshjwt: string = "";
@@ -218,11 +221,8 @@ class _r {
 }
 
 class eStream {
-  ctrl?: ReadableStreamDefaultController<any>;
   intervalID: Timer[] = [];
-  constructor(ctrl?: ReadableStreamDefaultController<any>) {
-    this.ctrl = ctrl;
-  }
+  constructor(public ctrl?: ReadableStreamDefaultController<any>) {}
   push(
     fn: () => {
       id: string | number;
@@ -272,15 +272,13 @@ class eStream {
 export class response extends _r {
   [Key: string]: any;
   lang: string = "en";
-  request!: request;
   status?: number;
   stream?: eStream;
   private headers: obj<string> = {};
   private __session!: ServerSide;
   private __jwt!: ServerSide;
-  constructor(req: request) {
+  constructor(public request: request) {
     super();
-    this.request = req;
   }
   async get?(...args: any[]): Promise<any>;
   async post?(...args: any[]): Promise<any>;
@@ -352,16 +350,13 @@ const wssClients: Map<string, obj<repsWSS>> = new Map();
 export class wss {
   [Key: string]: any;
   ws!: ServerWebSocket<{ wclass: wss }>;
-  request: request;
   path: string;
   id: string;
   broadcasting = false;
   max: number = 0;
-  // session?: ServerSide;
-  constructor(req: request) {
-    this.request = req;
-    this.path = req.path;
-    // Use BODY id instead? but how
+
+  constructor(public request: request) {
+    this.path = request.path;
     this.id = make.ID(10);
   }
   async init?(...args: any[]): Promise<void>;
@@ -496,13 +491,12 @@ class Xurl {
   }
 }
 
+// Singleton
 class Router {
-  id: string;
+  private static router: Router;
   apt: string = "";
   headstr: string = "";
-  constructor(id: string) {
-    this.id = id;
-  }
+  private constructor(public id: string) {}
   set route(yurl: Yurl) {
     const { url, isFile, isWS, parsedURL, _class } = yurl;
     let RT = isWS ? WPaths : isFile ? FPaths : Paths;
@@ -593,6 +587,12 @@ class Router {
       return new Xurl({ Yurl: YURL, status: 200 }, args);
     } else return this.isFile(isFile, { parsed, _path });
   }
+  static get init() {
+    if (!Router.router) {
+      Router.router = new Router(make.ID(7));
+    }
+    return Router.router;
+  }
 }
 
 /*
@@ -602,14 +602,12 @@ class Router {
 */
 
 export class Fsyt {
-  rpath: string;
-  data: string;
-  constructor(rpath: string, data: any = {}) {
-    this.rpath = rpath;
-    this.data = JSON.stringify(data);
-  }
+  constructor(
+    public rpath: string,
+    public data: any = {},
+  ) {}
   _head() {
-    return `<script type="module">import x from "${this.rpath}";x.dom(${this.data});</script>`;
+    return `<script type="module">import x from "${this.rpath}";x.dom(${str.stringify(this.data)});</script>`;
   }
 }
 
@@ -625,7 +623,7 @@ class Session {
     this.jwt = sh.jwt;
   }
 }
-
+const S = new Session();
 /*
 -------------------------
 
@@ -645,11 +643,13 @@ class Runner {
   isWSS: boolean;
   x_args: string[];
   method: string;
+  apt: string;
   constructor(req: Request, server?: Server) {
     this.req = new request(req, server);
     const { upgrade, parsed, method, path } = this.req;
     this.isWSS = !!upgrade;
-    this.X = R.get({ parsed, wss: this.isWSS, _path: path });
+    this.X = Router.init.get({ parsed, wss: this.isWSS, _path: path });
+    this.apt = Router.init.apt;
     const { Yurl, x_args } = this.X;
     this.Y = Yurl;
     this.x_args = x_args;
@@ -671,7 +671,10 @@ class Runner {
       this.X.status = 206;
       return bytes.slice(_s, _e + 1);
     } else {
-      this.X.header = { "Cache-Control": "max-age=31536000" };
+      // 1 day -- in seconds
+      this.X.header = {
+        "Cache-Control": "max-age=86400, must-revalidate",
+      };
       return is.arraybuff(bytes) ? this.X.gzip(bytes) : bytes;
     }
   }
@@ -681,11 +684,11 @@ class Runner {
     if (bytes) {
       CTX = this.file(bytes, bytes.byteLength, fileType);
     } else {
-      const FL = file(R.apt + url);
-      if (await FL.exists()) {
+      const FL = file(this.apt + url);
+      try {
         const isMedia = fileType.startsWith("video/");
         CTX = this.file(isMedia ? FL : await FL.bytes(), FL.size, fileType);
-      } else {
+      } catch (error) {
         this.X.status = 404;
       }
     }
@@ -948,8 +951,8 @@ use function.apply(),if the function doesn't change anything in "this"
 kk
 -------------------------
 */
-const R = new Router(make.ID(7));
-const S = new Session();
+
+// const R = new Router(make.ID(7));
 
 const LSocket = {
   async open(
@@ -1017,14 +1020,14 @@ const LSocket = {
 
 export class Lycaon extends _r {
   static headstr: string = "";
-  dir: string = "./";
   apt: string;
+  router: Router;
   constructor(
-    dir: string,
+    public dir: string = "./",
     options: { envPath?: string; appDir?: string; session?: Auth } = {},
   ) {
     super();
-    this.dir = dir;
+    this.router = Router.init;
     const PRIV = this.dir + "/.private";
     const { envPath, appDir, session } = options;
     //
@@ -1034,11 +1037,11 @@ export class Lycaon extends _r {
     }
     this.apt = dir + "/" + (appDir ?? "app") + "/";
 
-    R.apt = this.apt;
+    this.router.apt = this.apt;
     //
-    require("dotenv").config({
-      path: (envPath ? envPath : PRIV) + "/.env",
-    });
+
+    config({ path: (envPath ? envPath : PRIV) + "/.env" });
+
     //
 
     const SH = session ?? new Auth({ dir: this.dir });
@@ -1054,7 +1057,7 @@ export class Lycaon extends _r {
    */
   path(path: string) {
     return <T extends typeof response>(f: T) => {
-      R.route = new Yurl({ url: path, _class: f });
+      this.router.route = new Yurl({ url: path, _class: f });
       return f;
     };
   }
@@ -1068,7 +1071,7 @@ export class Lycaon extends _r {
     const fs = str.strip(furl, ".");
     let rr = fs.startsWith("/") ? fs : "/" + fs;
 
-    R.route = new Yurl({
+    this.router.route = new Yurl({
       url: rr,
       isFile: true,
       withSession: option.session,
@@ -1092,7 +1095,7 @@ export class Lycaon extends _r {
       if (opts.maxClient) {
         _fr.maxClient = opts.maxClient;
       }
-      R.route = _fr;
+      this.router.route = _fr;
       return f;
     };
     return ins;
@@ -1103,11 +1106,11 @@ export class Lycaon extends _r {
       session: false,
     },
   ) {
-    R.folder(path, option);
+    this.router.folder(path, option);
   }
   folders(...paths: string[]) {
     paths.forEach((pt) => {
-      R.folder(pt);
+      this.router.folder(pt);
     });
   }
   redirect(url: string) {
