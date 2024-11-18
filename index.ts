@@ -1,4 +1,3 @@
-/// <reference path="./types/types.d.ts" />
 import {
   BunFile,
   file,
@@ -12,9 +11,9 @@ import {
   serve,
 } from "bun";
 import { config } from "dotenv";
-import { O, str, is, path, html, get, Time, make } from "./tl";
+
+import { O, str, is, path, html, get, Time, make, headP } from "./tl";
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
-import { writeFile, writeFileSync } from "fs";
 
 export interface obj<T> {
   [Key: string]: T;
@@ -46,7 +45,7 @@ DECORATORS
 */
 
 export function session(...itm: any[]) {
-  const [a, b, c] = itm;
+  const [_, __, c] = itm;
 
   const OG: () => any = c.value;
 
@@ -62,7 +61,7 @@ export function session(...itm: any[]) {
   return c;
 }
 export function jwt(...itm: any[]) {
-  const [a, b, c] = itm;
+  const [_, __, c] = itm;
   const OG: () => any = c.value;
   c.value = async function (args: any = {}) {
     if ("jwt" in args) {
@@ -76,7 +75,7 @@ export function jwt(...itm: any[]) {
   return c;
 }
 export function jwt_refresh(...itm: any[]) {
-  const [a, b, c] = itm;
+  const [_, __, c] = itm;
   const OG: () => any = c.value;
   c.value = async function (args: any = {}) {
     if ("jwt_refresh" in args) {
@@ -700,7 +699,7 @@ class Runner {
     const { Yurl, headers, x_args } = this.X;
     let status = 500;
     if (Yurl) {
-      const { url, _class, args, broadcastWSS, maxClient, withSession } = Yurl;
+      const { _class, args, broadcastWSS, maxClient, withSession } = Yurl;
       if (_class) {
         let allowUpgrade = true;
 
@@ -1017,6 +1016,12 @@ const LSocket = {
     }
   },
 };
+interface dev {
+  url?: string;
+  hostname?: string;
+  method?: string;
+  port?: number;
+}
 
 export class Lycaon extends _r {
   static headstr: string = "";

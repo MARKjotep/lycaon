@@ -1,6 +1,60 @@
-/// <reference path="./types/types.d.ts" />
 import { BunFile, CryptoHasher, file } from "bun";
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
+
+type V = string | number | boolean;
+
+interface obj<T> {
+  [Key: string]: T;
+}
+
+type meta<T> = {
+  charset?: T;
+  content?: T;
+  "http-equiv"?: T;
+  name?: T;
+  media?: T;
+  url?: T;
+};
+type link<T> = {
+  href?: T;
+  hreflang?: T;
+  media?: T;
+  referrerpolicy?: T;
+  rel?: "stylesheet" | "icon" | "manifest" | T;
+  sizes?: T;
+  title?: T;
+  type?: T;
+  as?: T;
+};
+type impmap = {
+  imports?: obj<string>;
+  scopes?: obj<string>;
+  integrity?: obj<string>;
+};
+type script<T> = {
+  async?: T;
+  crossorigin?: T;
+  defer?: T;
+  integrity?: T;
+  nomodule?: T;
+  referrerpolicy?: T;
+  src?: T;
+  type?: "text/javascript" | T;
+  id?: T;
+  importmap?: impmap;
+  body?: T;
+};
+type base = {
+  href?: string;
+  target?: "_blank" | "_parent" | "_self" | "_top";
+};
+export interface headP {
+  title?: string;
+  base?: base[];
+  meta?: meta<V>[];
+  link?: link<V>[];
+  script?: script<V>[];
+}
 
 export const $$ = {
   set p(a: any) {
