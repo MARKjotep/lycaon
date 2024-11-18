@@ -12,7 +12,8 @@ import {
 } from "bun";
 import { config } from "dotenv";
 
-import { O, str, is, path, html, get, Time, make, headP } from "./tl";
+import { O, str, is, path, html, get, Time, make, headP } from "../__";
+
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
 
 export interface obj<T> {
