@@ -12,23 +12,61 @@ import {
 } from "bun";
 import { config } from "dotenv";
 
-import { O, str, is, path, html, get, Time, make, headP } from "../__";
+import {
+  $$,
+  O,
+  str,
+  is,
+  path,
+  html,
+  get,
+  Time,
+  make,
+  headP,
+} from "../_misc/__";
 
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 export interface obj<T> {
   [Key: string]: T;
 }
 
-export const $$ = {
-  set p(a: any) {
-    if (Array.isArray(a)) {
-      console.log(...a);
-    } else {
-      console.log(a);
+export { $$ };
+
+const _is = {
+  file: (path: string, data?: string) => {
+    try {
+      writeFileSync(path, data ?? "", { flag: "wx" });
+    } catch (error) {
+      //
     }
+    return true;
   },
-  textD: new TextDecoder(),
+  dir: (path: string) => {
+    mkdirSync(path, { recursive: true });
+    return true;
+  },
+};
+
+const _get = {
+  tls: (dir: string) => {
+    return O.items(process.env)
+      .filter((k) => {
+        if (k[0].startsWith("TLS_")) return k;
+      })
+      .reduce<obj<BunFile>>((ob, mt) => {
+        const [kk, vv] = mt;
+        if (vv) {
+          const ky = kk.replace("TLS_", "").toLowerCase();
+          ob[ky] = file(dir + "/" + vv);
+        }
+        return ob;
+      }, {});
+  },
+  mimeType: (fileStr: string) => {
+    return file(fileStr).type;
+  },
 };
 
 /*
@@ -430,7 +468,7 @@ class Yurl {
     if (isFile) {
       this.preload = preload;
       this.withSession = withSession;
-      this.fileType = get.mimeType(url);
+      this.fileType = _get.mimeType(url);
     }
   }
   loadbytes(apt: string) {
@@ -601,7 +639,7 @@ class Router {
 -------------------------
 */
 
-export class Fsyt {
+export class Hellmo {
   constructor(
     public rpath: string,
     public data: any = {},
@@ -785,14 +823,14 @@ class Runner {
       this.X.status = CTX.status;
       this.X.header = CTX.headers.toJSON();
       return await CTX.arrayBuffer();
-    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Fsyt)) {
+    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Hellmo)) {
       //
       this.X.type = "application/json";
       return this.X.gzip(JSON.stringify(CTX));
     } else {
       let bscr = "",
         _ctx = "";
-      if (CTX instanceof Fsyt) {
+      if (CTX instanceof Hellmo) {
         bscr = CTX._head();
       } else {
         _ctx = CTX as string;
@@ -1038,8 +1076,8 @@ export class Lycaon extends _r {
     const { envPath, appDir, session } = options;
     //
     if (!envPath) {
-      is.dir(PRIV);
-      is.file(PRIV + "/.env", `SECRET_KEY="${make.ID(20)}"`);
+      _is.dir(PRIV);
+      _is.file(PRIV + "/.env", `SECRET_KEY="${make.ID(20)}"`);
     }
     this.apt = dir + "/" + (appDir ?? "app") + "/";
 
@@ -1146,7 +1184,7 @@ export class Lycaon extends _r {
       //
       serve({
         port: port,
-        tls: get.tls(this.dir),
+        tls: _get.tls(this.dir),
         ...(hostname && { hostname }),
         fetch: async (req, server) => {
           //

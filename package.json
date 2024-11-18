@@ -18,9 +18,7 @@
     "url": "https://github.com/MARKjotep/lycaon/issues"
   },
   "homepage": "https://github.com/MARKjotep/lycaon#readme",
-  "scripts": {
-    "build": "tsc ; dist=../../DIST/lycaon/ ; cp -r package.json $dist ; cp -r ./types/types.d.ts $dist/types; bun install --cwd $dist; "
-  },
+  "scripts": {},
   "dependencies": {
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
