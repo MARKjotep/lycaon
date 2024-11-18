@@ -500,7 +500,7 @@ class Router {
   set route(yurl: Yurl) {
     const { url, isFile, isWS, parsedURL, _class } = yurl;
     let RT = isWS ? WPaths : isFile ? FPaths : Paths;
-    const sp = str.stringify(parsedURL);
+    const sp = str.ngify(parsedURL);
     const ISP = RT.get(sp);
     if (!ISP) {
       RT.set(sp, yurl);
@@ -557,7 +557,7 @@ class Router {
     if (ppop) isFile = path.type(ppop, true).pop() == "file";
     const args: string[] = [];
     const RT = wss ? WPaths : isFile ? FPaths : Paths;
-    let YURL: Yurl | undefined = RT.get(str.stringify(parsed));
+    let YURL: Yurl | undefined = RT.get(str.ngify(parsed));
     //
     if (!YURL) {
       const mtch: string[] = [];
@@ -578,7 +578,7 @@ class Router {
           }
         }
       }
-      YURL = RT.get(str.stringify(mtch));
+      YURL = RT.get(str.ngify(mtch));
     }
 
     //
@@ -607,7 +607,7 @@ export class Fsyt {
     public data: any = {},
   ) {}
   _head() {
-    return `<script type="module">import x from "${this.rpath}";x.dom(${str.stringify(this.data)});</script>`;
+    return `<script type="module">import x from "${this.rpath}";x.dom(${str.ngify(this.data)});</script>`;
   }
 }
 
