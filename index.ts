@@ -12,7 +12,7 @@ import {
 } from "bun";
 import { config } from "dotenv";
 
-import { O, str, is, path, html, get, Time, make, headP } from "../_misc/__";
+import { O, str, is, path, get, Time, make, headP } from "../_misc/__";
 
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -50,6 +50,114 @@ const _is = {
   dir: (path: string) => {
     mkdirSync(path, { recursive: true });
     return true;
+  },
+};
+
+type V = string | number | boolean;
+
+const html = {
+  attr: (attr: obj<V>) => {
+    return O.items(attr)
+      .reduce<string[]>(
+        (acc, [k, v]) => {
+          acc.push(is.bool(v) ? k : `${k}="${v}"`);
+          return acc;
+        },
+        [""],
+      )
+      .join(" ");
+  },
+  head: (v?: headP) => {
+    if (v) {
+      return O.items(v).reduce<string[]>((acc, [kk, vv]) => {
+        if (is.str(vv)) {
+          acc.push(`<${kk}>${vv}</${kk}>`);
+        } else if (is.arr(vv)) {
+          const rdced = vv.reduce((prv, vl) => {
+            let ender = "";
+            if (kk == "script") {
+              let scrptbdy = "";
+              if ("importmap" in vl) {
+                vl["type"] = "importmap";
+                scrptbdy = JSON.stringify(vl.importmap);
+                delete vl.importmap;
+              } else if ("body" in vl) {
+                scrptbdy = vl.body;
+                delete vl.body;
+              }
+              ender = `${scrptbdy}</${kk}>`;
+            }
+            prv.push(`<${kk}${html.attr(vl)}>${ender}`);
+            return prv;
+          }, []);
+          acc.push(...rdced);
+        }
+
+        return acc;
+      }, []);
+    }
+    return [];
+  },
+  cookie: (
+    key: string,
+    value: string = "",
+    {
+      maxAge,
+      expires,
+      path,
+      domain,
+      secure,
+      httpOnly,
+      sameSite,
+    }: {
+      maxAge?: Date | number;
+      expires?: Date | string | number;
+      path?: string | null;
+      domain?: string;
+      secure?: boolean;
+      httpOnly?: boolean;
+      sameSite?: string | null;
+      sync_expires?: boolean;
+      max_size?: number;
+    },
+  ) => {
+    if (maxAge instanceof Date) {
+      maxAge = maxAge.getSeconds();
+    }
+
+    if (expires instanceof Date) {
+      expires = expires.toUTCString();
+    } else if (expires === 0) {
+      expires = new Date().toUTCString();
+    }
+
+    const cprops = [
+      ["Domain", domain],
+      ["Expires", expires],
+      ["Max-Age", maxAge],
+      ["Secure", secure],
+      ["HttpOnly", httpOnly],
+      ["Path", path],
+      ["SameSite", sameSite],
+    ];
+
+    return cprops
+      .reduce<string[]>(
+        (acc, [kk, v]) => {
+          if (v !== undefined) acc.push(`${kk}=${v}`);
+          return acc;
+        },
+        [`${key}=${value}`],
+      )
+      .join("; ");
+  },
+  html: (_ctx: any, head: string, lang: string, body?: string) => {
+    const hdr = head;
+    let TX = `<!DOCTYPE html><html lang="${lang}">`;
+    TX += `<head>${hdr}</head>`;
+    TX += body ? body : `<body id="${make.ID(5)}">${_ctx}</body>`;
+    TX += "</html>";
+    return TX;
   },
 };
 
@@ -643,13 +751,26 @@ class Router {
 -------------------------
 */
 
-export class Hellmo {
+export class Render {
   constructor(
-    public rpath: string,
-    public data: any = {},
+    private app: any,
+    private data: any = {},
   ) {}
-  _head() {
-    return `<script type="module">import x from "${this.rpath}";x.dom(${str.ngify(this.data)});</script>`;
+  _head(path: string) {
+    return `<script type="module">import x from "${path}";x.ctx(${str.ngify(this.data)});</script>`;
+  }
+  async render(head: string, lang: string) {
+    if (is.str(this.app)) {
+      let bscr = this._head(this.app);
+      return html.html("", head + bscr, lang);
+    } else {
+      if ("ssr" in this.app) {
+        const TX = await this.app.ssr(this.data);
+        //
+        return html.html("", head + TX.script, lang, TX.body);
+      }
+    }
+    return html.html("", head, lang);
   }
 }
 
@@ -665,6 +786,7 @@ class Session {
     this.jwt = sh.jwt;
   }
 }
+
 const S = new Session();
 /*
 -------------------------
@@ -827,20 +949,15 @@ class Runner {
       this.X.status = CTX.status;
       this.X.header = CTX.headers.toJSON();
       return await CTX.arrayBuffer();
-    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Hellmo)) {
-      //
+    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Render)) {
       this.X.type = "application/json";
       return this.X.gzip(JSON.stringify(CTX));
     } else {
-      let bscr = "",
-        _ctx = "";
-      if (CTX instanceof Hellmo) {
-        bscr = CTX._head();
-      } else {
-        _ctx = CTX as string;
-      }
       this.X.type = "text/html";
-      const _HT = html.html(_ctx, head + bscr, lang);
+      if (CTX instanceof Render) {
+        return this.X.gzip(await CTX.render(head, lang));
+      }
+      const _HT = html.html(CTX, head, lang);
       return this.X.gzip(_HT);
     }
   }
@@ -950,6 +1067,7 @@ class Runner {
           //
           this.X.header = header;
           //
+
           // Process CTX
           if (CTX) {
             //
@@ -965,6 +1083,7 @@ class Runner {
                 await S.session.saveSession(SS, this.X.headers);
               }
               //
+
               return this.push(
                 await this.ctx(
                   CTX,
