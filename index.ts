@@ -12,18 +12,7 @@ import {
 } from "bun";
 import { config } from "dotenv";
 
-import {
-  $$,
-  O,
-  str,
-  is,
-  path,
-  html,
-  get,
-  Time,
-  make,
-  headP,
-} from "../_misc/__";
+import { O, str, is, path, html, get, Time, make, headP } from "../_misc/__";
 
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -32,7 +21,22 @@ export interface obj<T> {
   [Key: string]: T;
 }
 
-export { $$ };
+export class $$ {
+  static set p(a: any) {
+    if (is.arr(a)) {
+      console.log(...a);
+    } else {
+      console.log(a);
+    }
+  }
+  static rand(min = 6, max?: number) {
+    if (max) {
+      return Math.round(Math.random() * (max - min) + min);
+    }
+    const rndInt = Math.floor(Math.random() * min) + 1;
+    return rndInt - 1;
+  }
+}
 
 const _is = {
   file: (path: string, data?: string) => {
@@ -1092,7 +1096,7 @@ export class Lycaon extends _r {
     S.init(SH);
 
     //
-    this.file("./fsyt.js");
+
     //
   }
   /**
