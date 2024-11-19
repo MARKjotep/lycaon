@@ -11,19 +11,86 @@ import {
   serve,
 } from "bun";
 import { config } from "dotenv";
-
-import { O, str, is, path, get, Time, make, headP } from "../_misc/__";
-
+import {
+  isFile,
+  isDir,
+  oItems,
+  oLen,
+  oAss,
+  oKeys,
+  ngify,
+  strip,
+  sparse,
+  isArr,
+  isStr,
+  isBool,
+  isDict,
+  getArgs,
+  getByteRange,
+  parsePath,
+  pathType,
+  Time,
+  makeID,
+} from "./core/@";
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { isArrayBuffer } from "node:util/types";
 
 export interface obj<T> {
   [Key: string]: T;
 }
 
+type meta<T> = {
+  charset?: T;
+  content?: T;
+  "http-equiv"?: T;
+  name?: T;
+  media?: T;
+  url?: T;
+};
+type link<T> = {
+  href?: T;
+  hreflang?: T;
+  media?: T;
+  referrerpolicy?: T;
+  rel?: "stylesheet" | "icon" | "manifest" | T;
+  sizes?: T;
+  title?: T;
+  type?: T;
+  as?: T;
+};
+type impmap = {
+  imports?: obj<string>;
+  scopes?: obj<string>;
+  integrity?: obj<string>;
+};
+type script<T> = {
+  async?: T;
+  crossorigin?: T;
+  defer?: T;
+  integrity?: T;
+  nomodule?: T;
+  referrerpolicy?: T;
+  src?: T;
+  type?: "text/javascript" | T;
+  id?: T;
+  importmap?: impmap;
+  body?: T;
+};
+type base = {
+  href?: string;
+  target?: "_blank" | "_parent" | "_self" | "_top";
+};
+export interface headP {
+  title?: string;
+  base?: base[];
+  meta?: meta<V>[];
+  link?: link<V>[];
+  script?: script<V>[];
+}
+
 export class $$ {
   static set p(a: any) {
-    if (is.arr(a)) {
+    if (isArr(a)) {
       console.log(...a);
     } else {
       console.log(a);
@@ -38,29 +105,14 @@ export class $$ {
   }
 }
 
-const _is = {
-  file: (path: string, data?: string) => {
-    try {
-      writeFileSync(path, data ?? "", { flag: "wx" });
-    } catch (error) {
-      //
-    }
-    return true;
-  },
-  dir: (path: string) => {
-    mkdirSync(path, { recursive: true });
-    return true;
-  },
-};
-
 type V = string | number | boolean;
 
 const html = {
   attr: (attr: obj<V>) => {
-    return O.items(attr)
+    return oItems(attr)
       .reduce<string[]>(
         (acc, [k, v]) => {
-          acc.push(is.bool(v) ? k : `${k}="${v}"`);
+          acc.push(isBool(v) ? k : `${k}="${v}"`);
           return acc;
         },
         [""],
@@ -69,10 +121,10 @@ const html = {
   },
   head: (v?: headP) => {
     if (v) {
-      return O.items(v).reduce<string[]>((acc, [kk, vv]) => {
-        if (is.str(vv)) {
+      return oItems(v).reduce<string[]>((acc, [kk, vv]) => {
+        if (isStr(vv)) {
           acc.push(`<${kk}>${vv}</${kk}>`);
-        } else if (is.arr(vv)) {
+        } else if (isArr(vv)) {
           const rdced = vv.reduce((prv, vl) => {
             let ender = "";
             if (kk == "script") {
@@ -155,7 +207,7 @@ const html = {
     const hdr = head;
     let TX = `<!DOCTYPE html><html lang="${lang}">`;
     TX += `<head>${hdr}</head>`;
-    TX += body ? body : `<body id="${make.ID(5)}">${_ctx}</body>`;
+    TX += body ? body : `<body id="${makeID(5)}">${_ctx}</body>`;
     TX += "</html>";
     return TX;
   },
@@ -163,7 +215,7 @@ const html = {
 
 const _get = {
   tls: (dir: string) => {
-    return O.items(process.env)
+    return oItems(process.env)
       .filter((k) => {
         if (k[0].startsWith("TLS_")) return k;
       })
@@ -274,7 +326,7 @@ class request {
     return this.headers.get("content-type");
   }
   get cookies() {
-    if (!O.length(this.__cookies)) {
+    if (!oLen(this.__cookies)) {
       const cookie = this.headers.get("cookie");
       if (cookie) {
         this.__cookies = cookie.split(";").reduce<obj<string>>((ob, d) => {
@@ -316,7 +368,7 @@ class request {
     return this.url.pathname;
   }
   get parsed() {
-    const { parsed } = path.parse(this.path);
+    const { parsed } = parsePath(this.path);
     return parsed;
   }
   get searchParams() {
@@ -356,7 +408,7 @@ class _r {
     return this.headattr;
   }
   set head(heads: headP) {
-    O.items(heads).forEach(([k, v]) => {
+    oItems(heads).forEach(([k, v]) => {
       if (k == "title" || k == "base") {
         this.headattr[k] = v;
       } else {
@@ -458,7 +510,7 @@ export class response extends _r {
     return S.jwtInt.jwt();
   }
   set header(head: obj<string>) {
-    O.ass(this.headers, head);
+    oAss(this.headers, head);
   }
   get header() {
     return this.headers;
@@ -507,7 +559,7 @@ export class wss {
 
   constructor(public request: request) {
     this.path = request.path;
-    this.id = make.ID(10);
+    this.id = makeID(10);
   }
   async init?(...args: any[]): Promise<void>;
   async open() {}
@@ -570,7 +622,7 @@ class Yurl {
     preload?: boolean;
     isWS?: boolean;
   }) {
-    const { parsed, args } = path.parse(url);
+    const { parsed, args } = parsePath(url);
     this.url = url;
     this.parsedURL = parsed;
     this.args = args;
@@ -616,7 +668,7 @@ class Xurl {
     },
     x_args?: string[],
   ) {
-    O.ass(this, {
+    oAss(this, {
       Yurl,
       status,
     });
@@ -624,7 +676,7 @@ class Xurl {
     this.x_args = x_args ?? [];
   }
   set header(head: obj<string>) {
-    O.items(head).forEach(([k, v]) => {
+    oItems(head).forEach(([k, v]) => {
       this.headers.set(k, v);
     });
   }
@@ -650,7 +702,7 @@ class Router {
   set route(yurl: Yurl) {
     const { url, isFile, isWS, parsedURL, _class } = yurl;
     let RT = isWS ? WPaths : isFile ? FPaths : Paths;
-    const sp = str.ngify(parsedURL);
+    const sp = ngify(parsedURL);
     const ISP = RT.get(sp);
     if (!ISP) {
       RT.set(sp, yurl);
@@ -661,8 +713,8 @@ class Router {
     }
   }
   folder(path: string, option = {}) {
-    path = str.strip(path, ".");
-    path = str.strip(path, "/");
+    path = strip(path, ".");
+    path = strip(path, "/");
     ZPaths.set(path, option);
   }
   private isFile(
@@ -704,15 +756,15 @@ class Router {
   }) {
     let isFile: boolean = false;
     const ppop = parsed.slice().pop();
-    if (ppop) isFile = path.type(ppop, true).pop() == "file";
+    if (ppop) isFile = pathType(ppop, true).pop() == "file";
     const args: string[] = [];
     const RT = wss ? WPaths : isFile ? FPaths : Paths;
-    let YURL: Yurl | undefined = RT.get(str.ngify(parsed));
+    let YURL: Yurl | undefined = RT.get(ngify(parsed));
     //
     if (!YURL) {
       const mtch: string[] = [];
       for (const rr of RT.keys()) {
-        const STP = str.parse(rr) as string[];
+        const STP = sparse(rr) as string[];
         const STLen = STP.length;
         if (parsed.length === STLen) {
           for (let i = 0; i < STLen; i++) {
@@ -728,7 +780,7 @@ class Router {
           }
         }
       }
-      YURL = RT.get(str.ngify(mtch));
+      YURL = RT.get(ngify(mtch));
     }
 
     //
@@ -739,7 +791,7 @@ class Router {
   }
   static get init() {
     if (!Router.router) {
-      Router.router = new Router(make.ID(7));
+      Router.router = new Router(makeID(7));
     }
     return Router.router;
   }
@@ -757,10 +809,12 @@ export class Render {
     private data: any = {},
   ) {}
   _head(path: string) {
-    return `<script type="module">import x from "${path}";x.ctx(${str.ngify(this.data)});</script>`;
+    const isl = path.startsWith(".");
+    if (!isl) path = "." + path;
+    return `<script type="module">import x from "${path}";x.ctx(${ngify(this.data)});</script>`;
   }
   async render(head: string, lang: string) {
-    if (is.str(this.app)) {
+    if (isStr(this.app)) {
       let bscr = this._head(this.app);
       return html.html("", head + bscr, lang);
     } else {
@@ -827,7 +881,7 @@ class Runner {
     this.X.type = fileType;
     const range = this.req.range;
     if (range) {
-      const [_s, _e, _z] = get.byteRange(size, range);
+      const [_s, _e, _z] = getByteRange(size, range);
       this.X.header = {
         "Content-Range": `bytes ${_s}-${_e}/${_z}`,
         "Content-Length": size.toString(),
@@ -839,7 +893,7 @@ class Runner {
       this.X.header = {
         "Cache-Control": "max-age=86400, must-revalidate",
       };
-      return is.arraybuff(bytes) ? this.X.gzip(bytes) : bytes;
+      return isArrayBuffer(bytes) ? this.X.gzip(bytes) : bytes;
     }
   }
   async isFile() {
@@ -868,7 +922,7 @@ class Runner {
       if (_class) {
         let allowUpgrade = true;
 
-        const z_args = get.args(args, x_args);
+        const z_args = getArgs(args, x_args);
         const FS = new _class(this.req) as wss;
 
         const { sid } = await this.req.authgroup();
@@ -895,7 +949,7 @@ class Runner {
         let _WS = wssClients.get(rurl);
         if (!_WS) wssClients.set(rurl, {});
         _WS = wssClients.get(rurl) ?? {};
-        const clen = O.length(_WS);
+        const clen = oLen(_WS);
 
         if (allowUpgrade && maxClient && clen >= maxClient) {
           allowUpgrade = false;
@@ -938,8 +992,8 @@ class Runner {
         }
       }
     }
-    if (O.length(a_args)) {
-      O.ass(z_args, a_args);
+    if (oLen(a_args)) {
+      oAss(z_args, a_args);
     }
 
     return;
@@ -949,7 +1003,7 @@ class Runner {
       this.X.status = CTX.status;
       this.X.header = CTX.headers.toJSON();
       return await CTX.arrayBuffer();
-    } else if (is.dict(CTX as obj<string>) && !(CTX instanceof Render)) {
+    } else if (isDict(CTX as obj<string>) && !(CTX instanceof Render)) {
       this.X.type = "application/json";
       return this.X.gzip(JSON.stringify(CTX));
     } else {
@@ -1017,7 +1071,7 @@ class Runner {
 
     FS.stream = new eStream();
     const CTX = await FS["eventStream"]!(z_args);
-    if (is.dict(CTX) && "error" in CTX) {
+    if (isDict(CTX) && "error" in CTX) {
       this.X.status = CTX.error;
       return "";
     }
@@ -1052,7 +1106,7 @@ class Runner {
       } else if (_class) {
         //
         const FS = new _class(this.req) as response;
-        const z_args = get.args(args, this.x_args);
+        const z_args = getArgs(args, this.x_args);
         // check for valid session or jwt and return error: code if not.
 
         await this.auth(FS, z_args);
@@ -1074,7 +1128,7 @@ class Runner {
             if (this.method === "post" && CTX instanceof ServerSide) {
               //
               return this.push(await this.jwt(CTX), status);
-            } else if (is.dict(CTX) && "error" in CTX) {
+            } else if (isDict(CTX) && "error" in CTX) {
               //
               this.X.status = CTX.error as number;
             } else {
@@ -1113,7 +1167,7 @@ kk
 -------------------------
 */
 
-// const R = new Router(make.ID(7));
+// const R = new Router(makeID(7));
 
 const LSocket = {
   async open(
@@ -1128,7 +1182,7 @@ const LSocket = {
     if (WC) {
       WC.ws = ws;
       const cid = WC.id;
-      const clen = O.length(client);
+      const clen = oLen(client);
       if (!(cid in client)) {
         const role = clen ? "joiner" : "maker";
         client[cid] = {
@@ -1170,8 +1224,8 @@ const LSocket = {
       const wid = WC.id;
       delete client[wid];
 
-      if (O.length(client) === 1) {
-        O.keys(client).forEach((c, indx) => {
+      if (oLen(client) === 1) {
+        oKeys(client).forEach((c, indx) => {
           client[c].role = "maker";
         });
       }
@@ -1199,8 +1253,8 @@ export class Lycaon extends _r {
     const { envPath, appDir, session } = options;
     //
     if (!envPath) {
-      _is.dir(PRIV);
-      _is.file(PRIV + "/.env", `SECRET_KEY="${make.ID(20)}"`);
+      isDir(PRIV);
+      isFile(PRIV + "/.env", `SECRET_KEY="${makeID(20)}"`);
     }
     this.apt = dir + "/" + (appDir ?? "app") + "/";
 
@@ -1235,7 +1289,7 @@ export class Lycaon extends _r {
       preload: false,
     },
   ) {
-    const fs = str.strip(furl, ".");
+    const fs = strip(furl, ".");
     let rr = fs.startsWith("/") ? fs : "/" + fs;
 
     this.router.route = new Yurl({

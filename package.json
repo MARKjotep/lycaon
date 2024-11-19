@@ -1,11 +1,18 @@
 {
   "name": "lycaon",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "lycaon",
   "author": "Marky <markjotep@gmail.com>",
   "license": "MIT",
-  "types": "index.d.ts",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "link__": "mkdir -p ./src/core; ln -sf ../../../_misc/@.ts ./src/core; ln -sf ../_misc/tsconfig.json ./",
+    "build": "tsc && bun build ./src/index.ts --outdir ./dist --minify --packages external --target bun && rollup -c ./util/rollup.config.js"
+  },
   "keywords": [
     "ts",
     "bun"
@@ -18,7 +25,6 @@
     "url": "https://github.com/MARKjotep/lycaon/issues"
   },
   "homepage": "https://github.com/MARKjotep/lycaon#readme",
-  "scripts": {},
   "dependencies": {
     "dotenv": "^16.4.5",
     "jsonwebtoken": "^9.0.2",
