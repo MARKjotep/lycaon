@@ -5,10 +5,10 @@ import {
   Server,
   ServerWebSocket,
   WebSocketHandler,
-  gzipSync,
   write,
   gunzipSync,
   serve,
+  deflateSync,
 } from "bun";
 import { config } from "dotenv";
 import {
@@ -31,9 +31,9 @@ import {
   pathType,
   Time,
   makeID,
+  isArraybuff,
 } from "./core/@";
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
-import { isArrayBuffer } from "node:util/types";
 
 export interface obj<T> {
   [Key: string]: T;
@@ -249,9 +249,7 @@ DECORATORS
 
 export function session(...itm: any[]) {
   const [_, __, c] = itm;
-
   const OG: () => any = c.value;
-
   c.value = async function (args: any = {}) {
     if ("session" in args && args.session) {
       const nms: any = [args];
@@ -302,6 +300,7 @@ class request {
   formData?: FormData;
   headers: Headers;
   url: URL;
+  method: string;
   __cookies: obj<string> = {};
   constructor(
     public req: Request,
@@ -309,6 +308,7 @@ class request {
   ) {
     this.headers = req.headers ?? new Headers();
     this.url = new URL(req.url);
+    this.method = this.req.method.toLowerCase();
   }
   get auth() {
     const auth = this.headers.get("authorization");
@@ -361,9 +361,7 @@ class request {
     const f = "text/event-stream";
     return this.accept?.includes(f);
   }
-  get method() {
-    return this.req.method.toLowerCase();
-  }
+
   get path() {
     return this.url.pathname;
   }
@@ -684,10 +682,10 @@ class Xurl {
     this.headers.set("Content-Type", content);
   }
   gzip(ctx: Uint8Array | string | ArrayBuffer) {
-    const buffd = gzipSync(ctx);
+    const buffd = deflateSync(ctx);
     this.header = {
       "Content-Length": buffd.byteLength.toString(),
-      "Content-Encoding": "gzip",
+      "Content-Encoding": "deflate",
     };
     return buffd;
   }
@@ -893,7 +891,7 @@ class Runner {
       this.X.header = {
         "Cache-Control": "max-age=86400, must-revalidate",
       };
-      return isArrayBuffer(bytes) ? this.X.gzip(bytes) : bytes;
+      return isArraybuff(bytes) ? this.X.gzip(bytes) : bytes;
     }
   }
   async isFile() {
@@ -1353,6 +1351,7 @@ export class Lycaon extends _r {
         url: `http://${hostname}:${port}${url ?? "/"}`,
         method: method,
       } as Request).response();
+
       const ARB = await CTX.arrayBuffer();
       ARB.byteLength && write(this.apt + "index.html", gunzipSync(ARB));
 

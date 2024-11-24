@@ -67,6 +67,7 @@ declare class request {
     formData?: FormData;
     headers: Headers;
     url: URL;
+    method: string;
     __cookies: obj<string>;
     constructor(req: Request, server?: Server | undefined);
     get auth(): string | undefined;
@@ -77,7 +78,6 @@ declare class request {
     get ip(): "" | bun.SocketAddress;
     get isForm(): boolean;
     get isEventStream(): boolean | undefined;
-    get method(): string;
     get path(): string;
     get parsed(): string[];
     get searchParams(): URLSearchParams;
