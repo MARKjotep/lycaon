@@ -10,7 +10,7 @@
     "dist"
   ],
   "scripts": {
-    "link__": "mkdir -p ./src/core; ln -sf ../../../_misc/@.ts ./src/core; ln -sf ../_misc/tsconfig.json ./",
+    "link__": "mkdir -p ./src/core; ln -sf ../../../_misc/@.ts ./src/core; ln -sf ../../../_misc/@n.ts ./src/core; ln -sf ../_misc/tsconfig.json ./",
     "build": "tsc && bun build ./src/index.ts --outdir ./dist --minify --packages external --target bun && rollup -c ./util/rollup.config.js"
   },
   "keywords": [

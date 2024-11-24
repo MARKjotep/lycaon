@@ -12,8 +12,6 @@ import {
 } from "bun";
 import { config } from "dotenv";
 import {
-  isFile,
-  isDir,
   oItems,
   oLen,
   oAss,
@@ -34,6 +32,7 @@ import {
   isArraybuff,
 } from "./core/@";
 import { Auth, AuthInterface, ServerSide, JWTInterface } from "authored";
+import { isDir, isFile } from "./core/@n";
 
 export interface obj<T> {
   [Key: string]: T;
